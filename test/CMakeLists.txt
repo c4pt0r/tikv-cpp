@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
 
-enable_testing()
-
 add_subdirectory(3rd_party/catch)
 include_directories(../include)
 
