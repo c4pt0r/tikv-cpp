@@ -4,9 +4,10 @@
 #define CATCH_CONFIG_MAIN
 #include "3rd_party/catch/catch.hpp"
 
-
-TEST_CASE("simple") {
+TEST_CASE("get region by key") {
     tikv::pd_client pd("pd://localhost:2379");
-    pd.get_cluster_id();
-    REQUIRE( 3 == 3 );
+    tikv::region_info region;
+    tikv::resp r = pd.get_region("hello", &region);
+    REQUIRE(r.ok());
 }
+

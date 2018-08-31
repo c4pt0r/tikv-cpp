@@ -15,9 +15,8 @@ class resp {
   resp(const std::string& key, const std::string& val):
     is_err_(false), key_(key), val_(val) {}
 
-  resp(const std::vector<resp>& resps):
+  resp(const std::vector<tikv::resp>& resps):
     is_err_(false), batchval_(resps) {}
-
 
  public:
   ~resp(void) = default;
@@ -25,14 +24,14 @@ class resp {
   resp& operator=(const resp&) = default;
 
  public:
-  void set_error_msg(const std::string& err) { errmsg_ = err; }
+  void set_error_msg(const std::string& err) { is_err_= true; errmsg_ = err; }
   void set_key(const std::string& key) { key_ = key; }
   void set_value(const std::string& val) { val_ = val; }
   resp& operator<<(const resp& r); 
 
  public:
-  bool ok() const;
-  const std::string& error_msg() const;
+  bool ok() const { return is_err_ == false; }
+  const std::string& error_msg() const { return errmsg_; }
 
   const std::vector<resp>& resps() const;
   const std::string& key() const;
@@ -45,6 +44,8 @@ class resp {
   std::string 	val_;
   std::vector<tikv::resp> batchval_;
 };
+
+static resp respok = resp();
 
 class client {
 
