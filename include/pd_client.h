@@ -24,8 +24,15 @@ class pd_client {
   // Also it may return nil if PD finds no Region for the key temporarily,
   // client should retry later.
   resp get_region(const std::string& key, region_info* ret); 
+  // GetRegionByID gets a region and its leader Peer from PD by id.
   resp get_region_by_id(uint64_t region_id, region_info* ret);
+  // GetStore gets a store from PD by store id.
+	// The store may expire later. Caller is responsible for caching and taking care
+	// of store change.
   resp get_store_by_id(uint64_t store_id, store_info* ret);
+  // GetAllStores gets all stores from pd.
+	// The store may expire later. Caller is responsible for caching and taking care
+	// of store change.
   resp get_all_stores(std::vector<store_info>* ret);
   uint64_t get_cluster_id() { return cluster_id_; }
 
