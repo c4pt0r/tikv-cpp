@@ -7,7 +7,7 @@
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
-#include "logging.hpp"
+#include "logging.h"
 #include "utils.hpp"
 
 #include "pd_client.h"
