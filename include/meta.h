@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <unistd.h>
+#include <map>
+#include <vector>
 
 namespace tikv {
 

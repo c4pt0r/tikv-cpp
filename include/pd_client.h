@@ -4,8 +4,8 @@
 #include <boost/thread/shared_mutex.hpp>
 
 #include "kvproto/pdpb.grpc.pb.h"
-#include "client.hpp"
-#include "meta.hpp"
+#include "client.h"
+#include "meta.h"
 
 namespace tikv {
 
@@ -25,14 +25,16 @@ class pd_client {
   // client should retry later.
   resp get_region(const std::string& key, region_info* ret); 
   resp get_region_by_id(uint64_t region_id, region_info* ret);
-  resp get_store(uint64_t store_id, store_info* ret);
+  resp get_store_by_id(uint64_t store_id, store_info* ret);
+  resp get_all_stores(std::vector<store_info>* ret);
   uint64_t get_cluster_id() { return cluster_id_; }
 
 private:
   resp get_pd_members_inner(pdpb::PD::Stub* stub, std::map<uint64_t, pd_server_info>* out_members, uint64_t* out_cluster_id);
   resp get_region_inner(pdpb::PD::Stub* stub, const std::string& key, region_info* ret); 
   resp get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id, region_info* ret);
-  resp get_store_inner(pdpb::PD::Stub* stub, uint64_t store_id, store_info* ret);  
+  resp get_store_by_id_inner(pdpb::PD::Stub* stub, uint64_t store_id, store_info* ret); 
+  resp get_all_stores_inner(pdpb::PD::Stub* stub, std::vector<store_info>* ret);
 
   bool update_leader(pdpb::PD::Stub* stub);
   pdpb::PD::Stub* get_leader_stub(bool force=false);
