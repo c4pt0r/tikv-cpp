@@ -9,13 +9,14 @@
 #include <grpcpp/security/credentials.h>
 #include "logging.h"
 #include "utils.hpp"
+#include "3rd_party/cpp-btree/btree_map.h"
 
 #include "pd_client.h"
 
 namespace tikv {
 
 pd_client::pd_client(const std::string& addr) {
-  assert(init(addr));
+  init(addr);
 }
 
 // public APIs 

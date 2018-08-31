@@ -1,6 +1,7 @@
 #include <string>
 #include "pd_client.h"
 #include "logging.h"
+#include "3rd_party/cpp-btree/btree_map.h"
 
 #define CATCH_CONFIG_MAIN
 #include "3rd_party/catch/catch.hpp"
@@ -26,4 +27,16 @@ TEST_CASE("get stores") {
     LOG("store" << ret[0].id << ":" << info.addr);
     REQUIRE(r.ok());
     REQUIRE(info.addr.size() > 0);
+}
+
+TEST_CASE("btree") {
+  btree::btree_map<int, std::string> m;
+  m[1] = "1";
+  m[3] = "3";
+  m[5] = "5";
+
+  auto it = m.upper_bound(3);
+  REQUIRE(it.key() == 5);
+  it = m.lower_bound(3);
+  REQUIRE(it.key() == 3);
 }
