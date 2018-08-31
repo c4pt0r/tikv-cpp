@@ -13,11 +13,22 @@ struct pd_server_info {
   bool is_leader;
 };
 
-struct region_info {
+struct region_version_id {
   uint64_t id;
+  uint64_t conf_ver;
+  uint64_t ver;
+};
+
+struct peer_info {
+  uint64_t id;
+  uint64_t store_id;
+};
+
+struct region_info {
+  region_version_id ver_id;
   std::string start_key;
   std::string end_key;
-  uint64_t leader_store_id;
+  std::vector<peer_info> peers;
 };
 
 enum store_state {
@@ -32,6 +43,7 @@ struct store_info {
   store_state state;
   std::map<std::string, std::string> labels;
 };
+
 
 class resp {
  public:

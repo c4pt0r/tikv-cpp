@@ -9,7 +9,8 @@
 TEST_CASE("get region by key") {
     tikv::pd_client pd("pd://localhost:2379");
     tikv::region_info region;
-    tikv::resp r = pd.get_region("hello", &region);
+    tikv::peer_info leader;
+    tikv::resp r = pd.get_region("hello", &region, &leader);
     REQUIRE(r.ok());
 }
 

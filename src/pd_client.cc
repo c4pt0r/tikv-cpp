@@ -21,12 +21,12 @@ pd_client::pd_client(const std::string& addr) {
 
 // public APIs 
 resp
-pd_client::get_region(const std::string& key, region_info* ret) {
-  tikv::resp r = get_region_inner(get_leader_stub(), key, ret);
+pd_client::get_region(const std::string& key, region_info* ret, peer_info* peer) {
+  tikv::resp r = get_region_inner(get_leader_stub(), key, ret, peer);
   if (!r.ok()) {
     LOG("rpc call error: " << r.error_msg());
     // force update leader rpc connect and retry
-    return get_region_inner(get_leader_stub(true), key, ret);
+    return get_region_inner(get_leader_stub(true), key, ret, peer);
   }
   return r;
 }
@@ -222,7 +222,7 @@ pd_client::get_all_stores_inner(pdpb::PD::Stub* stub, std::vector<store_info>* r
 }
 
 resp
-pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key, region_info* ret) {
+pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key, region_info* ret, peer_info* leader) {
   // make sure client has already been initialized.
   assert(cluster_id_ > 0);
   pdpb::GetRegionRequest req;
@@ -235,15 +235,20 @@ pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key, region
   grpc::Status st = stub->GetRegion(&ctx, req, &resp);
 
   if (st.ok()) {
-    ret->id = resp.region().id();
+    ret->ver_id.id = resp.region().id();
+    ret->ver_id.conf_ver = resp.region().region_epoch().conf_ver();
+    ret->ver_id.ver = resp.region().region_epoch().version();
     ret->start_key = resp.region().start_key();
     ret->end_key = resp.region().end_key();
-    LOG("get region info" \
-          << "region id:" << ret->id << " " \
-          << "start_key:" << ret->start_key << " " \
-          << "end_key:" << ret->end_key << std::endl);
-
-    ret->leader_store_id = resp.leader().id();
+    for (auto it = resp.region().peers().begin(); it != resp.region().peers().end(); it++) {
+      peer_info peer;
+      peer.id = it->id();
+      peer.store_id = it->store_id();
+      ret->peers.push_back(peer);
+    }
+    // ret->leader_store_id = resp.leader().id();
+    leader->store_id = resp.leader().store_id();
+    leader->id = resp.leader().id();
     return tikv::respok;
   } else {
     tikv::resp r;
