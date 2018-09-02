@@ -10,7 +10,7 @@ const std::string kDefaultCf = "df";
 
 class client {
  public:
-
+/*
   resp get(const std::string& key, const std::string& cf);
   resp put(const std::string& key, const std::string& val, const std::string& cf);
 
@@ -34,6 +34,7 @@ private:
   // 1. find region by key  
   // 2. get store info 
   // 3. get conn through store addr
+  */
 };
 
 };

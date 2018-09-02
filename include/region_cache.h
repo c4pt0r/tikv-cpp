@@ -4,12 +4,13 @@
 #include "logging.h"
 #include "meta.h"
 
+#include "pd_client.h"
+
 namespace tikv {
 
 class region_cache {
 
  public:
-
   class key_loc {
    public:
     bool contains(const std::string& key) {
@@ -46,6 +47,17 @@ class region_cache {
     uint64_t last_access_;
   };
 
+ public:
+  region_cache(std::shared_ptr<pd_client> pd_client):
+      pd_client_(pd_client) {}
+
+  key_loc locate_key(const std::string& key);
+
+ private:
+  cached_region search_cache(const std::string& key);
+  cached_region get_cached_region(region_version_id verid);  
+  cached_region load_region_from_pd(const std::string& key);  
+
  private:
   boost::shared_mutex region_lock_;
   // end_key => region
@@ -56,6 +68,9 @@ class region_cache {
   boost::shared_mutex store_lock_;
   // store id => store
   std::map<uint64_t, store_info> stores_;
+
+  // pd client, for quering region info and store info
+  std::shared_ptr<pd_client> pd_client_;
 
 }; // end of region_cache
 

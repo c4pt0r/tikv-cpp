@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.1)
 project(tikv-cpp-api)
 
 include_directories(SYSTEM)
+include_directories(./3rd_party)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Boost REQUIRED COMPONENTS thread)

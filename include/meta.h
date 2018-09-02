@@ -8,6 +8,7 @@ namespace tikv {
 
 struct pd_server_info {
   uint64_t id;
+  uint64_t cluster_id;
   std::string name;
   std::vector<std::string> client_urls;
   bool is_leader;
@@ -44,7 +45,12 @@ struct store_info {
   std::map<std::string, std::string> labels;
 };
 
+struct Error {
+  std::string error;
+  Error(const std::string& errmsg): error(errmsg) {}
+};
 
+/*
 class resp {
  public:
   resp(void):
@@ -84,5 +90,6 @@ class resp {
 };
 
 static resp respok = resp();
+*/
 
 };
