@@ -18,6 +18,14 @@ struct region_version_id {
   uint64_t id;
   uint64_t conf_ver;
   uint64_t ver;
+  bool operator< (const region_version_id& b) const {
+    if (ver < b.ver) {
+      return true;
+    } else if (ver == b.ver) {
+      return conf_ver < b.conf_ver;
+    }
+    return false;
+  }
 };
 
 struct peer_info {
@@ -30,6 +38,11 @@ struct region_info {
   std::string start_key;
   std::string end_key;
   std::vector<peer_info> peers;
+
+  bool contains(const std::string& key) {
+    return start_key.compare(key) <= 0 
+              && (end_key.compare(key) > 0 || end_key.size() == 0);
+  }
 };
 
 enum store_state {

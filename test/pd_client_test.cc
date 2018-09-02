@@ -36,7 +36,12 @@ TEST_CASE("btree") {
   m[3] = "3";
   m[5] = "5";
 
-  auto it = m.upper_bound(3);
+  auto it = m.upper_bound(4);
+  REQUIRE(it.key() == 5);
+  it = m.lower_bound(4);
+  REQUIRE(it.key() == 5);
+
+  it = m.upper_bound(3);
   REQUIRE(it.key() == 5);
   it = m.lower_bound(3);
   REQUIRE(it.key() == 3);
