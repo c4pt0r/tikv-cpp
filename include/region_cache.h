@@ -13,16 +13,15 @@ namespace tikv {
 class region_cache {
 
  public:
-  class key_loc {
-   public:
-    bool contains(const std::string& key) {
-      return start_key_.compare(key) <= 0 
-                && (end_key_.compare(key) > 0 || end_key_.size() == 0);
-    }
-   private:
-    std::string start_key_;
-    std::string end_key_;
+  struct key_loc {
+    std::string start_key;
+    std::string end_key;
     region_version_id region_ver_id;
+
+    bool contains(const std::string& key) {
+      return start_key.compare(key) <= 0 
+                && (end_key.compare(key) > 0 || end_key.size() == 0);
+    }
   };
 
   struct rpc_context {
@@ -38,19 +37,15 @@ class region_cache {
     peer_info leader;
     std::atomic<uint64_t> last_access;
 
-    cached_region(const region_info& ri, const peer_info& pi):
-      region(ri), leader(pi), last_access(0) {}
+    cached_region(): last_access(0) {};
 
     cached_region(const cached_region& b):
       region(b.region), leader(b.leader), last_access(b.last_access.load()) {}
-    
-    void switch_leader(uint64_t store_id) {
-      for (auto it= region.peers.begin(); it!= region.peers.end();it++) {
-          if (it->store_id == store_id) {
-            LOG("leader of region " << region.ver_id.id << " switch to" << store_id);
-            leader = *it;
-          }
-      }
+    cached_region& operator=(const cached_region &b) {
+      region = b.region;
+      leader = b.leader;
+      last_access = b.last_access.load();
+      return *this; 
     }
   };
 
@@ -58,13 +53,16 @@ class region_cache {
   region_cache(std::shared_ptr<pd_client> pd_client):
       pd_client_(pd_client) {}
 
-  key_loc locate_key(const std::string& key);
+  Result<key_loc,Error> locate_key(const std::string& key);
+
+  void dump_cache();
 
  private:
+  void insert_region_to_cache(const region_info& r);
   boost::optional<region_info> search_cache(const std::string& key);
   boost::optional<region_info> get_cached_region(region_version_id verid);  
-  Result<cached_region, Error> load_region_from_pd(const std::string& key);  
-  Result<cached_region, Error> load_region_from_pd_by_id(uint64_t region_id);  
+  Result<region_info, Error> load_region_from_pd(const std::string& key);  
+  Result<region_info, Error> load_region_from_pd_by_id(uint64_t region_id);  
 
  private:
   boost::shared_mutex region_lock_;

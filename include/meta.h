@@ -38,11 +38,21 @@ struct region_info {
   std::string start_key;
   std::string end_key;
   std::vector<peer_info> peers;
+  peer_info leader;
 
   bool contains(const std::string& key) {
     return start_key.compare(key) <= 0 
               && (end_key.compare(key) > 0 || end_key.size() == 0);
   }
+
+  void switch_leader(uint64_t store_id) {
+    for (auto it= peers.begin(); it!= peers.end();it++) {
+      if (it->store_id == store_id) {
+        leader = *it;
+      }
+    }
+  }
+
 };
 
 enum store_state {

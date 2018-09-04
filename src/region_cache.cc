@@ -1,23 +1,66 @@
 #include <atomic>
+#include <iostream>
 #include "region_cache.h"
 
 
 namespace tikv {
 
-/*
-region_cache::key_loc region_cache::locate_key(const std::string& key) {
-  // load loc from cache
+Result<region_cache::key_loc, Error>
+region_cache::locate_key(const std::string& key) {
   region_lock_.lock_shared();
-  region_lock_.unlock_shared();
+  auto cached = search_cache(key);
+  if (cached != boost::none) {
+    key_loc ret;
+    ret.start_key = cached->start_key;
+    ret.end_key = cached->end_key;
+    ret.region_ver_id = cached->ver_id;
+    region_lock_.unlock();
+    return Ok(ret);
+  }
+  region_lock_.unlock();
 
-  // if cache miss, request pd
-  region_info r = load_region(key) 
-
+  auto r = load_region_from_pd(key);
+  if (r.isOk()) {
+    region_info region = r.unwrap();
+    insert_region_to_cache(region);
+    key_loc ret;
+    ret.start_key = region.start_key;
+    ret.end_key = region.end_key;
+    ret.region_ver_id = region.ver_id;
+    return Ok(ret);
+  } else {
+    return Err(r.unwrapErr());
+  }
 }
 
-*/
+void
+region_cache::dump_cache() {
+  for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
+    cached_region cr = cached_regions_[it->second.ver_id];
+    LOG("[" << cr.region.start_key << cr.region.end_key << ") => Leader store:" 
+        << cr.region.leader.store_id << std::endl);
+  }
+}
 
-boost::optional<region_info> region_cache::get_cached_region(region_version_id verid) {
+void
+region_cache::insert_region_to_cache(const region_info& r) {
+  boost::unique_lock<boost::shared_mutex> l(region_lock_);
+  // update btree
+  auto it = sorted_.find(r.end_key);
+  if (it != sorted_.end()) {
+    // remove old item 
+    cached_regions_.erase(it->second.ver_id);
+  }
+  sorted_[r.end_key] = r;
+  // update cached region info 
+  cached_region cr;
+  cr.region = r;
+  cr.last_access = ::time(NULL);
+  cached_regions_[r.ver_id] = cr;
+}
+
+boost::optional<region_info>
+region_cache::get_cached_region(region_version_id verid) {
   boost::shared_lock<boost::shared_mutex> l(region_lock_);
   auto it = cached_regions_.find(verid);
   if (it != cached_regions_.end()) {
@@ -29,7 +72,8 @@ boost::optional<region_info> region_cache::get_cached_region(region_version_id v
   return boost::none;
 }
 
-boost::optional<region_info> region_cache::search_cache(const std::string& key) {
+boost::optional<region_info>
+region_cache::search_cache(const std::string& key) {
   boost::shared_lock<boost::shared_mutex> l(region_lock_);
   auto it = sorted_.upper_bound(key);
   // TODO check region cache's TTL
@@ -39,12 +83,13 @@ boost::optional<region_info> region_cache::search_cache(const std::string& key) 
   return boost::none;
 }
 
-Result<region_cache::cached_region, Error> region_cache::load_region_from_pd(const std::string& key) {
+Result<region_info, Error>
+region_cache::load_region_from_pd(const std::string& key) {
   Result<std::pair<region_info, peer_info>, Error> ret = pd_client_->get_region(key);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
-  const region_info &r = ret.unwrap().first;
+  region_info r = ret.unwrap().first;
   const peer_info &leader = ret.unwrap().second;
 
   if (r.peers.size() == 0) {
@@ -52,19 +97,19 @@ Result<region_cache::cached_region, Error> region_cache::load_region_from_pd(con
     return Err(Error("this region has no peers"));
   }
 
-  cached_region cr(r, r.peers[0]);
   if (leader.id > 0 && leader.store_id > 0) {
-    cr.switch_leader(leader.store_id);
+    r.switch_leader(leader.store_id);
   }
-  return Ok(cr);
+  return Ok(r);
 }
 
-Result<region_cache::cached_region, Error> region_cache::load_region_from_pd_by_id(uint64_t region_id) {
+Result<region_info, Error>
+region_cache::load_region_from_pd_by_id(uint64_t region_id) {
   Result<std::pair<region_info, peer_info>, Error> ret = pd_client_->get_region_by_id(region_id);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
-  const region_info &r = ret.unwrap().first;
+  region_info r = ret.unwrap().first;
   const peer_info &leader = ret.unwrap().second;
 
   if (r.peers.size() == 0) {
@@ -72,11 +117,10 @@ Result<region_cache::cached_region, Error> region_cache::load_region_from_pd_by_
     return Err(Error("this region has no peers"));
   }
 
-  cached_region cr(r, r.peers[0]);
   if (leader.id > 0 && leader.store_id > 0) {
-    cr.switch_leader(leader.store_id);
+    r.switch_leader(leader.store_id);
   }
-  return Ok(cr);
+  return Ok(r);
 }
 
 
