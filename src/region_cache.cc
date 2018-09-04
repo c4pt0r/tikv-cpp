@@ -10,17 +10,19 @@ region_cache::locate_key(const std::string& key) {
   region_lock_.lock_shared();
   auto cached = search_cache(key);
   if (cached != boost::none) {
+    LOG("got region info in region cache!");
     key_loc ret;
     ret.start_key = cached->start_key;
     ret.end_key = cached->end_key;
     ret.region_ver_id = cached->ver_id;
-    region_lock_.unlock();
+    region_lock_.unlock_shared();
     return Ok(ret);
   }
-  region_lock_.unlock();
+  region_lock_.unlock_shared();
 
   auto r = load_region_from_pd(key);
   if (r.isOk()) {
+    LOG("load region from pd");
     region_info region = r.unwrap();
     insert_region_to_cache(region);
     key_loc ret;
@@ -37,7 +39,7 @@ void
 region_cache::dump_cache() {
   for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
     cached_region cr = cached_regions_[it->second.ver_id];
-    LOG("[" << cr.region.start_key << cr.region.end_key << ") => Leader store:" 
+    LOG("[" << to_hex(cr.region.start_key) << to_hex(cr.region.end_key) << ") => Leader store:" 
         << cr.region.leader.store_id << std::endl);
   }
 }
@@ -51,6 +53,7 @@ region_cache::insert_region_to_cache(const region_info& r) {
     // remove old item 
     cached_regions_.erase(it->second.ver_id);
   }
+  LOG("update region cache");
   sorted_[r.end_key] = r;
   // update cached region info 
   cached_region cr;
@@ -63,7 +66,7 @@ boost::optional<region_info>
 region_cache::get_cached_region(region_version_id verid) {
   boost::shared_lock<boost::shared_mutex> l(region_lock_);
   auto it = cached_regions_.find(verid);
-  if (it != cached_regions_.end()) {
+  if (it != cached_regions_.end() && it->second.is_valid()) {
     // update access time
     uint64_t now = ::time(NULL);
     std::atomic_compare_exchange_strong(&(it->second.last_access), &now, now);

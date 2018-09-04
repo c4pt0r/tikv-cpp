@@ -8,7 +8,7 @@
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
 #include "logging.h"
-#include "utils.hpp"
+#include "utils.h"
 #include "cpp-btree/btree_map.h"
 
 #include "pd_client.h"
@@ -29,6 +29,18 @@ pd_client::get_region(const std::string& key) {
     return get_region_inner(get_leader_stub(true), key);
   }
   return r;
+}
+
+Result<std::pair<region_info, peer_info>, Error>
+pd_client::get_region_by_id(uint64_t region_id) {
+  auto r = get_region_by_id_inner(get_leader_stub(), region_id);
+  if (!r.isOk()) {
+    LOG("rpc call error: " << r.unwrapErr().error);
+    // force update leader rpc connect and retry
+    return get_region_by_id_inner(get_leader_stub(), region_id);
+  }
+  return r;
+
 }
 
 Result<store_info, Error>
@@ -213,6 +225,28 @@ pd_client::get_all_stores_inner(pdpb::PD::Stub* stub) {
   }
 }
 
+std::pair<region_info, peer_info>
+parse_get_region_result(const pdpb::GetRegionResponse& resp) {
+  region_info ret;
+  peer_info leader;
+  ret.ver_id.id = resp.region().id();
+  ret.ver_id.conf_ver = resp.region().region_epoch().conf_ver();
+  ret.ver_id.ver = resp.region().region_epoch().version();
+  ret.start_key = resp.region().start_key();
+  ret.end_key = resp.region().end_key();
+  for (auto it = resp.region().peers().begin(); it != resp.region().peers().end(); it++) {
+    peer_info peer;
+    peer.id = it->id();
+    peer.store_id = it->store_id();
+    ret.peers.push_back(peer);
+  }
+  // ret->leader_store_id = resp.leader().id();
+  leader.store_id = resp.leader().store_id();
+  leader.id = resp.leader().id();
+
+  return std::make_pair(ret, leader);
+}
+
 Result<std::pair<region_info, peer_info>, Error>
 pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key) {
   // make sure client has already been initialized.
@@ -227,26 +261,31 @@ pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key) {
   grpc::Status st = stub->GetRegion(&ctx, req, &resp);
 
   if (st.ok()) {
-    region_info ret;
-    peer_info leader;
-    ret.ver_id.id = resp.region().id();
-    ret.ver_id.conf_ver = resp.region().region_epoch().conf_ver();
-    ret.ver_id.ver = resp.region().region_epoch().version();
-    ret.start_key = resp.region().start_key();
-    ret.end_key = resp.region().end_key();
-    for (auto it = resp.region().peers().begin(); it != resp.region().peers().end(); it++) {
-      peer_info peer;
-      peer.id = it->id();
-      peer.store_id = it->store_id();
-      ret.peers.push_back(peer);
-    }
-    // ret->leader_store_id = resp.leader().id();
-    leader.store_id = resp.leader().store_id();
-    leader.id = resp.leader().id();
-    return Ok(std::make_pair(ret, leader));
+    return Ok(parse_get_region_result(resp));
   } else {
     return Err(Error(st.error_message()));
   }
 }
+
+Result<std::pair<region_info, peer_info>, Error>
+pd_client::get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id) {
+  // make sure client has already been initialized.
+  assert(cluster_id_ > 0);
+  pdpb::GetRegionByIDRequest req;
+  pdpb::GetRegionResponse resp;
+
+  req.mutable_header()->set_cluster_id(cluster_id_);
+  req.set_region_id(region_id);
+
+  grpc::ClientContext ctx;
+  grpc::Status st = stub->GetRegionByID(&ctx, req, &resp);
+
+  if (st.ok()) {
+    return Ok(parse_get_region_result(resp));
+  } else {
+    return Err(Error(st.error_message()));
+  }
+}
+
 
 } // namespace tikv

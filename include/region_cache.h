@@ -6,6 +6,7 @@
 #include "3rd_party/result/result.h"
 #include "logging.h"
 #include "meta.h"
+#include "utils.h"
 #include "pd_client.h"
 
 namespace tikv {
@@ -41,12 +42,19 @@ class region_cache {
 
     cached_region(const cached_region& b):
       region(b.region), leader(b.leader), last_access(b.last_access.load()) {}
+
     cached_region& operator=(const cached_region &b) {
       region = b.region;
       leader = b.leader;
       last_access = b.last_access.load();
       return *this; 
     }
+
+    bool is_valid() {
+      uint64_t dur = ::time(NULL) - last_access;
+      return dur < kDefaultRegionCacheTTL;
+    }
+
   };
 
  public:
@@ -63,6 +71,10 @@ class region_cache {
   boost::optional<region_info> get_cached_region(region_version_id verid);  
   Result<region_info, Error> load_region_from_pd(const std::string& key);  
   Result<region_info, Error> load_region_from_pd_by_id(uint64_t region_id);  
+
+ private:
+  // region cache ttl 600s
+  static const int kDefaultRegionCacheTTL = 10 * 60;
 
  private:
   boost::shared_mutex region_lock_;

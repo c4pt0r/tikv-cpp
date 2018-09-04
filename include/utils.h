@@ -2,18 +2,14 @@
 #include <string>
 #include <random>
 #include <iterator>
+#include <sstream>
+#include <iomanip>
 
 namespace tikv {
 
-std::string strip_url(const std::string& addr) {
-  std::string stripped_address;
-  std::string substr("://");
-  std::string::size_type i = addr.find(substr);
-  if(i != std::string::npos) {
-    stripped_address = addr.substr(i+substr.length());
-  }
-  return stripped_address;
-}
+std::string to_hex(const std::string& data);
+
+std::string strip_url(const std::string& addr);
 
 template<typename Iter, typename RandomGenerator>
 Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
@@ -24,9 +20,10 @@ Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
 
 template<typename Iter>
 Iter select_randomly(Iter start, Iter end) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    return select_randomly(start, end, gen);
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  return select_randomly(start, end, gen);
 }
+
 
 }
