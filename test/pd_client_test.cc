@@ -46,3 +46,23 @@ TEST_CASE("btree") {
   it = m.lower_bound(3);
   REQUIRE(it.key() == 3);
 }
+
+TEST_CASE("verid compare") {
+  tikv::region_version_id verid;
+  tikv::region_version_id verid1;
+
+  verid.id = 1;
+  verid.ver = 2;
+
+  std::map<tikv::region_version_id, int> m;
+  m[verid] = 1;
+
+  verid1.id = 1;
+  verid1.ver = 2;
+
+  bool ok =  !(verid < verid1);
+  
+  REQUIRE(ok == true);
+  
+  REQUIRE(m[verid1] == 1);
+}

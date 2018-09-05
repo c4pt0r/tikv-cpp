@@ -4,9 +4,10 @@ namespace tikv {
 
 std::string to_hex(const std::string& data) {
   std::stringstream ss;
-  ss << std::hex;
+  ss << std::hex << "[";
   for(int i=0;i<data.size();++i)
-    ss << std::setw(2) << std::setfill('0') << (int)(data.c_str()[i]);
+    ss << std::setw(2) << std::showbase << std::setfill('0') << (unsigned int)(data.c_str()[i]) << " ";
+  ss << "]";
   return ss.str();
 }
 

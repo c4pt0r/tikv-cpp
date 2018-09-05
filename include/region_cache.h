@@ -62,13 +62,15 @@ class region_cache {
       pd_client_(pd_client) {}
 
   Result<key_loc,Error> locate_key(const std::string& key);
+  void update_region_leader(region_version_id verid, uint16_t leader_store_id);
 
   void dump_cache();
 
  private:
   void insert_region_to_cache(const region_info& r);
-  boost::optional<region_info> search_cache(const std::string& key);
-  boost::optional<region_info> get_cached_region(region_version_id verid);  
+  void drop_region_from_cache(region_version_id region_id);
+  boost::optional<region_info&> search_cache(const std::string& key);
+  boost::optional<region_info&> get_cached_region(region_version_id verid);  
   Result<region_info, Error> load_region_from_pd(const std::string& key);  
   Result<region_info, Error> load_region_from_pd_by_id(uint64_t region_id);  
 

@@ -5,6 +5,15 @@
 
 namespace tikv {
 
+void
+region_cache::dump_cache() {
+  for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
+    cached_region cr = cached_regions_[it->second.ver_id];
+    LOG("[" << to_hex(cr.region.start_key) << "," << to_hex(cr.region.end_key) << ") => Leader store:" 
+        << cr.region.leader.store_id << std::endl);
+  }
+}
+
 Result<region_cache::key_loc, Error>
 region_cache::locate_key(const std::string& key) {
   region_lock_.lock_shared();
@@ -22,6 +31,7 @@ region_cache::locate_key(const std::string& key) {
 
   auto r = load_region_from_pd(key);
   if (r.isOk()) {
+    boost::unique_lock<boost::shared_mutex> l(region_lock_);
     LOG("load region from pd");
     region_info region = r.unwrap();
     insert_region_to_cache(region);
@@ -36,17 +46,16 @@ region_cache::locate_key(const std::string& key) {
 }
 
 void
-region_cache::dump_cache() {
-  for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
-    cached_region cr = cached_regions_[it->second.ver_id];
-    LOG("[" << to_hex(cr.region.start_key) << to_hex(cr.region.end_key) << ") => Leader store:" 
-        << cr.region.leader.store_id << std::endl);
+region_cache::update_region_leader(region_version_id verid, uint16_t leader_store_id) {
+  boost::unique_lock<boost::shared_mutex> l(region_lock_);
+  auto r = get_cached_region(verid);
+  if (r != boost::none) {
+    r->switch_leader(leader_store_id);
   }
 }
 
 void
 region_cache::insert_region_to_cache(const region_info& r) {
-  boost::unique_lock<boost::shared_mutex> l(region_lock_);
   // update btree
   auto it = sorted_.find(r.end_key);
   if (it != sorted_.end()) {
@@ -62,9 +71,19 @@ region_cache::insert_region_to_cache(const region_info& r) {
   cached_regions_[r.ver_id] = cr;
 }
 
-boost::optional<region_info>
+void 
+region_cache::drop_region_from_cache(region_version_id verid) {
+  boost::unique_lock<boost::shared_mutex> l(region_lock_);
+  auto it = cached_regions_.find(verid);
+  if (it == cached_regions_.end()) {
+    return ;
+  }
+  sorted_.erase(it->second.region.end_key);
+  cached_regions_.erase(it);
+}
+
+boost::optional<region_info&>
 region_cache::get_cached_region(region_version_id verid) {
-  boost::shared_lock<boost::shared_mutex> l(region_lock_);
   auto it = cached_regions_.find(verid);
   if (it != cached_regions_.end() && it->second.is_valid()) {
     // update access time
@@ -75,11 +94,9 @@ region_cache::get_cached_region(region_version_id verid) {
   return boost::none;
 }
 
-boost::optional<region_info>
+boost::optional<region_info&>
 region_cache::search_cache(const std::string& key) {
-  boost::shared_lock<boost::shared_mutex> l(region_lock_);
   auto it = sorted_.upper_bound(key);
-  // TODO check region cache's TTL
   if (it != sorted_.end() && it->second.contains(key)) {
     return get_cached_region(it->second.ver_id);
   }

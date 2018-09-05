@@ -7,30 +7,33 @@
 namespace tikv {
 
 struct pd_server_info {
-  uint64_t id;
-  uint64_t cluster_id;
+  uint64_t id = 0;
+  uint64_t cluster_id = 0;
   std::string name;
   std::vector<std::string> client_urls;
-  bool is_leader;
+  bool is_leader = false;
 };
 
 struct region_version_id {
-  uint64_t id;
-  uint64_t conf_ver;
-  uint64_t ver;
+  uint64_t id = 0;
+  uint64_t conf_ver = 0;
+  uint64_t ver = 0;
   bool operator< (const region_version_id& b) const {
-    if (ver < b.ver) {
-      return true;
-    } else if (ver == b.ver) {
-      return conf_ver < b.conf_ver;
+    if (id == b.id) {
+      if (ver == b.ver) {
+        return conf_ver < b.conf_ver;
+      } else {
+        return ver < b.ver;
+      }
+    } else {
+      return id < b.id;
     }
-    return false;
   }
 };
 
 struct peer_info {
-  uint64_t id;
-  uint64_t store_id;
+  uint64_t id = 0;
+  uint64_t store_id = 0;
 };
 
 struct region_info {
@@ -62,7 +65,7 @@ enum store_state {
 };
 
 struct store_info {
-  uint64_t id;
+  uint64_t id = 0;
   std::string addr;
   store_state state;
   std::map<std::string, std::string> labels;
@@ -72,47 +75,5 @@ struct Error {
   std::string error;
   Error(const std::string& errmsg): error(errmsg) {}
 };
-
-/*
-class resp {
- public:
-  resp(void):
-    is_err_(false) {}
-
-  resp(const std::string& key, const std::string& val):
-    is_err_(false), key_(key), val_(val) {}
-
-  resp(const std::vector<tikv::resp>& resps):
-    is_err_(false), batchval_(resps) {}
-
- public:
-  ~resp(void) = default;
-  resp(const resp&) = default;
-  resp& operator=(const resp&) = default;
-
- public:
-  void set_error_msg(const std::string& err) { is_err_= true; errmsg_ = err; }
-  void set_key(const std::string& key) { key_ = key; }
-  void set_value(const std::string& val) { val_ = val; }
-  resp& operator<<(const resp& r); 
-
- public:
-  bool ok() const { return is_err_ == false; }
-  const std::string& error_msg() const { return errmsg_; }
-
-  const std::vector<resp>& resps() const;
-  const std::string& key() const;
-  const std::string& value()const;
-
- private:
-  bool 			    is_err_;
-  std::string 	errmsg_;
-  std::string   key_;
-  std::string 	val_;
-  std::vector<tikv::resp> batchval_;
-};
-
-static resp respok = resp();
-*/
 
 };
