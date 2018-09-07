@@ -73,7 +73,6 @@ region_cache::insert_region_to_cache(const region_info& r) {
 
 void 
 region_cache::drop_region_from_cache(region_version_id verid) {
-  boost::unique_lock<boost::shared_mutex> l(region_lock_);
   auto it = cached_regions_.find(verid);
   if (it == cached_regions_.end()) {
     return ;
