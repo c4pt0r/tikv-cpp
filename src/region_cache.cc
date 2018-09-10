@@ -45,21 +45,35 @@ region_cache::locate_key(const std::string& key) {
   }
 }
 
-/*
 Result<region_cache::rpc_context, Error>
 region_cache::get_rpc_context(region_version_id ver_id) {
   region_lock_.lock_shared();
   auto r = get_cached_region(ver_id);
   if (r == boost::none) {
     region_lock_.unlock_shared();
-    return;
+    return Err(Error("region info out-of-date"));
   }
-  region_info ri = r;
+  region_info ri = *r;
   region_lock_.unlock_shared();
 
-  uint64_t leader_store_id = ri.leader.store_id;
+  auto ret = get_store_addr(ri.leader.store_id);
+  if (ret.isOk()) {
+    // something wrong with getting store addr
+    if (ret.unwrap().size() == 0) {
+      drop_region(ver_id);
+      return Err(Error("region info out-of-date"));
+    }
+
+    std::string addr = ret.unwrap();
+    rpc_context ctx;
+    ctx.addr = addr; 
+    ctx.meta = ri;
+    ctx.peer = ri.leader;
+    return Ok(ctx);
+  } else {
+    return Err(ret.unwrapErr());
+  }
 }
-*/
 
 void
 region_cache::drop_region(region_version_id ver_id) {
