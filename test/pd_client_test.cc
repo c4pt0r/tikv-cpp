@@ -60,7 +60,7 @@ TEST_CASE("verid compare") {
   verid1.id = 1;
   verid1.ver = 2;
 
-  bool ok =  !(verid < verid1);
+  bool ok = !(verid < verid1) && !(verid1 < verid);
 
   REQUIRE(ok == true);
 

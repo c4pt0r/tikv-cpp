@@ -12,10 +12,8 @@ TEST_CASE("get region and cache by key") {
 
   auto r = rc.locate_key("hello");
 
-  REQUIRE(r.isOk());
   auto rr = rc.locate_key("hello");
   REQUIRE(rr.isOk());
-
   rc.dump_cache();
 }
 

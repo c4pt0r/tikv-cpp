@@ -101,7 +101,7 @@ bool
 pd_client::update_leader(pdpb::PD::Stub* stub) {
   // update pd addrs
   uint64_t cluster_id;
-  Result<std::pair<std::map<uint64_t, pd_server_info>, pd_server_info>, Error> r = get_pd_members_inner(stub, &cluster_id);
+  auto r = get_pd_members_inner(stub, &cluster_id);
   if (r.isOk()) {
     boost::unique_lock<boost::shared_mutex> lock(rwlock_);
     members_ = r.unwrap().first;

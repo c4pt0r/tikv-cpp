@@ -45,10 +45,59 @@ region_cache::locate_key(const std::string& key) {
   }
 }
 
+/*
+Result<region_cache::rpc_context, Error>
+region_cache::get_rpc_context(region_version_id ver_id) {
+  region_lock_.lock_shared();
+  auto r = get_cached_region(ver_id);
+  if (r == boost::none) {
+    region_lock_.unlock_shared();
+    return;
+  }
+  region_info ri = r;
+  region_lock_.unlock_shared();
+
+  uint64_t leader_store_id = ri.leader.store_id;
+}
+*/
+
 void
-region_cache::update_region_leader(region_version_id verid, uint16_t leader_store_id) {
+region_cache::drop_region(region_version_id ver_id) {
   boost::unique_lock<boost::shared_mutex> l(region_lock_);
-  auto r = get_cached_region(verid);
+  drop_region_from_cache(ver_id);
+}
+
+Result<std::string, Error>
+region_cache::get_store_addr(uint64_t store_id) {
+  // try to find it in cache
+  store_lock_.lock_shared();
+  auto it = stores_.find(store_id);
+  if (it != stores_.end()) {
+    std::string addr = it->second.addr; 
+    store_lock_.unlock_shared();
+    return Ok(addr);
+  }
+  // if not found in cache
+  return reload_store_addr(store_id);
+}
+
+Result<std::string, Error>
+region_cache::reload_store_addr(uint64_t store_id) {
+  auto ret = pd_client_->get_store_by_id(store_id);
+  if (ret.isOk()) {
+    // update store cache  
+    boost::unique_lock<boost::shared_mutex> l(store_lock_);
+    stores_[store_id] = ret.unwrap();
+    return Ok(ret.unwrap().addr);
+  } else {
+    return Err(ret.unwrapErr());
+  }
+}
+
+void
+region_cache::update_region_leader(region_version_id ver_id, uint16_t leader_store_id) {
+  boost::unique_lock<boost::shared_mutex> l(region_lock_);
+  auto r = get_cached_region(ver_id);
   if (r != boost::none) {
     r->switch_leader(leader_store_id);
   }
@@ -72,8 +121,8 @@ region_cache::insert_region_to_cache(const region_info& r) {
 }
 
 void 
-region_cache::drop_region_from_cache(region_version_id verid) {
-  auto it = cached_regions_.find(verid);
+region_cache::drop_region_from_cache(region_version_id ver_id) {
+  auto it = cached_regions_.find(ver_id);
   if (it == cached_regions_.end()) {
     return ;
   }
@@ -82,8 +131,8 @@ region_cache::drop_region_from_cache(region_version_id verid) {
 }
 
 boost::optional<region_info&>
-region_cache::get_cached_region(region_version_id verid) {
-  auto it = cached_regions_.find(verid);
+region_cache::get_cached_region(region_version_id ver_id) {
+  auto it = cached_regions_.find(ver_id);
   if (it != cached_regions_.end() && it->second.is_valid()) {
     // update access time
     uint64_t now = ::time(NULL);
@@ -104,7 +153,7 @@ region_cache::search_cache(const std::string& key) {
 
 Result<region_info, Error>
 region_cache::load_region_from_pd(const std::string& key) {
-  Result<std::pair<region_info, peer_info>, Error> ret = pd_client_->get_region(key);
+  auto ret = pd_client_->get_region(key);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
@@ -124,7 +173,7 @@ region_cache::load_region_from_pd(const std::string& key) {
 
 Result<region_info, Error>
 region_cache::load_region_from_pd_by_id(uint64_t region_id) {
-  Result<std::pair<region_info, peer_info>, Error> ret = pd_client_->get_region_by_id(region_id);
+  auto ret = pd_client_->get_region_by_id(region_id);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
