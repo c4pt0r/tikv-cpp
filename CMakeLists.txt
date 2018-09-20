@@ -9,8 +9,6 @@ include_directories(SYSTEM)
 include_directories(./3rd_party)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(Boost REQUIRED COMPONENTS thread)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 
 add_subdirectory(3rd_party/cpp-btree)
