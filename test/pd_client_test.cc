@@ -7,9 +7,9 @@
 #include "3rd_party/catch/catch.hpp"
 
 TEST_CASE("get region by key") {
-  tikv::pd_client pd("pd://localhost:2379");
-  tikv::region_info region;
-  tikv::peer_info leader;
+  tikv::PDClient pd("pd://localhost:2379");
+  tikv::Region region;
+  tikv::Peer leader;
   auto r = pd.get_region("hello");
   region = r.unwrap().first;
   leader = r.unwrap().second;
@@ -17,8 +17,8 @@ TEST_CASE("get region by key") {
 }
 
 TEST_CASE("get stores") {
-  tikv::pd_client pd("pd://localhost:2379");
-  tikv::region_info region;
+  tikv::PDClient pd("pd://localhost:2379");
+  tikv::Region region;
   auto r = pd.get_all_stores();
   LOG("store count:" << r.unwrap().size());
   REQUIRE(r.isOk());
@@ -48,13 +48,13 @@ TEST_CASE("btree") {
 }
 
 TEST_CASE("verid compare") {
-  tikv::region_version_id verid;
-  tikv::region_version_id verid1;
+  tikv::RegionVerID verid;
+  tikv::RegionVerID verid1;
 
   verid.id = 1;
   verid.ver = 2;
 
-  std::map<tikv::region_version_id, int> m;
+  std::map<tikv::RegionVerID, int> m;
   m[verid] = 1;
 
   verid1.id = 1;

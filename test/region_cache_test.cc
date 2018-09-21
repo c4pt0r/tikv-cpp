@@ -7,13 +7,15 @@
 #include "3rd_party/catch/catch.hpp"
 
 TEST_CASE("get region and cache by key") {
-  auto pd = std::make_shared<tikv::pd_client>("pd://localhost:2379");
-  tikv::region_cache rc(pd);
+  auto pd = std::make_shared<tikv::PDClient>("pd://localhost:2379");
+  tikv::RegionCache rc(pd);
 
-  auto r = rc.locate_key("hello");
-
-  auto rr = rc.locate_key("hello");
+  bool hit = false;
+  auto r = rc.locate_key("hello", hit);
+  REQUIRE(hit == false);
+  auto rr = rc.locate_key("hello", hit);
   REQUIRE(rr.isOk());
+  REQUIRE(hit == true);
   rc.dump_cache();
 }
 

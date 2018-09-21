@@ -6,16 +6,16 @@
 namespace tikv {
 
 void
-region_cache::dump_cache() {
+RegionCache::dump_cache() {
   for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
     cached_region cr = cached_regions_[it->second.ver_id];
     LOG("[" << to_hex(cr.region.start_key) << "," << to_hex(cr.region.end_key) << ") => Leader store:" 
-        << cr.region.leader.store_id << std::endl);
+        << cr.region.leader->store_id << std::endl);
   }
 }
 
-Result<region_cache::key_loc, Error>
-region_cache::locate_key(const std::string& key) {
+Result<RegionCache::key_loc, Error>
+RegionCache::locate_key(const std::string& key, bool& cache_hit) {
   region_lock_.lock_shared();
   auto cached = search_cache(key);
   if (cached != boost::none) {
@@ -25,6 +25,7 @@ region_cache::locate_key(const std::string& key) {
     ret.end_key = cached->end_key;
     ret.region_ver_id = cached->ver_id;
     region_lock_.unlock_shared();
+    cache_hit = true;
     return Ok(ret);
   }
   region_lock_.unlock_shared();
@@ -33,30 +34,31 @@ region_cache::locate_key(const std::string& key) {
   if (r.isOk()) {
     boost::unique_lock<boost::shared_mutex> l(region_lock_);
     LOG("load region from pd");
-    region_info region = r.unwrap();
+    Region region = r.unwrap();
     insert_region_to_cache(region);
     key_loc ret;
     ret.start_key = region.start_key;
     ret.end_key = region.end_key;
     ret.region_ver_id = region.ver_id;
+    cache_hit = false;
     return Ok(ret);
   } else {
     return Err(r.unwrapErr());
   }
 }
 
-Result<region_cache::rpc_context, Error>
-region_cache::get_rpc_context(region_version_id ver_id) {
+Result<RegionCache::rpc_context, Error>
+RegionCache::get_rpc_context(RegionVerID ver_id) {
   region_lock_.lock_shared();
   auto r = get_cached_region(ver_id);
   if (r == boost::none) {
     region_lock_.unlock_shared();
     return Err(Error("region info out-of-date"));
   }
-  region_info ri = *r;
+  Region ri = *r;
   region_lock_.unlock_shared();
 
-  auto ret = get_store_addr(ri.leader.store_id);
+  auto ret = get_store_addr(ri.leader->store_id);
   if (ret.isOk()) {
     // something wrong with getting store addr
     if (ret.unwrap().size() == 0) {
@@ -68,7 +70,7 @@ region_cache::get_rpc_context(region_version_id ver_id) {
     rpc_context ctx;
     ctx.addr = addr; 
     ctx.meta = ri;
-    ctx.peer = ri.leader;
+    ctx.peer = *ri.leader;
     return Ok(ctx);
   } else {
     return Err(ret.unwrapErr());
@@ -76,13 +78,13 @@ region_cache::get_rpc_context(region_version_id ver_id) {
 }
 
 void
-region_cache::drop_region(region_version_id ver_id) {
+RegionCache::drop_region(RegionVerID ver_id) {
   boost::unique_lock<boost::shared_mutex> l(region_lock_);
   drop_region_from_cache(ver_id);
 }
 
 Result<std::string, Error>
-region_cache::get_store_addr(uint64_t store_id) {
+RegionCache::get_store_addr(uint64_t store_id) {
   // try to find it in cache
   store_lock_.lock_shared();
   auto it = stores_.find(store_id);
@@ -96,8 +98,8 @@ region_cache::get_store_addr(uint64_t store_id) {
 }
 
 Result<std::string, Error>
-region_cache::reload_store_addr(uint64_t store_id) {
-  auto ret = pd_client_->get_store_by_id(store_id);
+RegionCache::reload_store_addr(uint64_t store_id) {
+  auto ret = PDClient_->get_store_by_id(store_id);
   if (ret.isOk()) {
     // update store cache  
     boost::unique_lock<boost::shared_mutex> l(store_lock_);
@@ -109,7 +111,7 @@ region_cache::reload_store_addr(uint64_t store_id) {
 }
 
 void
-region_cache::update_region_leader(region_version_id ver_id, uint16_t leader_store_id) {
+RegionCache::update_region_leader(RegionVerID ver_id, uint16_t leader_store_id) {
   boost::unique_lock<boost::shared_mutex> l(region_lock_);
   auto r = get_cached_region(ver_id);
   if (r != boost::none) {
@@ -118,7 +120,7 @@ region_cache::update_region_leader(region_version_id ver_id, uint16_t leader_sto
 }
 
 void
-region_cache::insert_region_to_cache(const region_info& r) {
+RegionCache::insert_region_to_cache(const Region& r) {
   // update btree
   auto it = sorted_.find(r.end_key);
   if (it != sorted_.end()) {
@@ -135,7 +137,7 @@ region_cache::insert_region_to_cache(const region_info& r) {
 }
 
 void 
-region_cache::drop_region_from_cache(region_version_id ver_id) {
+RegionCache::drop_region_from_cache(RegionVerID ver_id) {
   auto it = cached_regions_.find(ver_id);
   if (it == cached_regions_.end()) {
     return ;
@@ -144,8 +146,8 @@ region_cache::drop_region_from_cache(region_version_id ver_id) {
   cached_regions_.erase(it);
 }
 
-boost::optional<region_info&>
-region_cache::get_cached_region(region_version_id ver_id) {
+boost::optional<Region&>
+RegionCache::get_cached_region(RegionVerID ver_id) {
   auto it = cached_regions_.find(ver_id);
   if (it != cached_regions_.end() && it->second.is_valid()) {
     // update access time
@@ -156,8 +158,8 @@ region_cache::get_cached_region(region_version_id ver_id) {
   return boost::none;
 }
 
-boost::optional<region_info&>
-region_cache::search_cache(const std::string& key) {
+boost::optional<Region&>
+RegionCache::search_cache(const std::string& key) {
   auto it = sorted_.upper_bound(key);
   if (it != sorted_.end() && it->second.contains(key)) {
     return get_cached_region(it->second.ver_id);
@@ -165,14 +167,14 @@ region_cache::search_cache(const std::string& key) {
   return boost::none;
 }
 
-Result<region_info, Error>
-region_cache::load_region_from_pd(const std::string& key) {
-  auto ret = pd_client_->get_region(key);
+Result<Region, Error>
+RegionCache::load_region_from_pd(const std::string& key) {
+  auto ret = PDClient_->get_region(key);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
-  region_info r = ret.unwrap().first;
-  const peer_info &leader = ret.unwrap().second;
+  Region r = ret.unwrap().first;
+  const Peer &leader = ret.unwrap().second;
 
   if (r.peers.size() == 0) {
     // this region has not peer
@@ -185,14 +187,14 @@ region_cache::load_region_from_pd(const std::string& key) {
   return Ok(r);
 }
 
-Result<region_info, Error>
-region_cache::load_region_from_pd_by_id(uint64_t region_id) {
-  auto ret = pd_client_->get_region_by_id(region_id);
+Result<Region, Error>
+RegionCache::load_region_from_pd_by_id(uint64_t region_id) {
+  auto ret = PDClient_->get_region_by_id(region_id);
   if (!ret.isOk()) {
     return Err(ret.unwrapErr());
   } 
-  region_info r = ret.unwrap().first;
-  const peer_info &leader = ret.unwrap().second;
+  Region r = ret.unwrap().first;
+  const Peer &leader = ret.unwrap().second;
 
   if (r.peers.size() == 0) {
     // this region has not peer

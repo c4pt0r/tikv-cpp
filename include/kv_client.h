@@ -8,7 +8,7 @@ namespace tikv {
 
 const std::string kDefaultCf = "df";
 
-class client {
+class Client {
  public:
 /*
   resp get(const std::string& key, const std::string& cf);

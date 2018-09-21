@@ -9,48 +9,48 @@
 
 namespace tikv {
 
-class pd_client {
+class PDClient {
  public:
-  pd_client(const std::string& addr);
+  PDClient(const std::string& addr);
 
   bool init(const std::string& pdaddr);
 
   void close();
 
   // return val pair=>{{id=>pd_server}, leader_pd}
-  Result<std::pair<std::map<uint64_t, pd_server_info>, pd_server_info>, Error> get_pd_members();
+  Result<std::pair<std::map<uint64_t, PDServerInfo>, PDServerInfo>, Error> get_pd_members();
   // GetRegion gets a region and its leader Peer from PD by key.
   // The region may expire after split. Caller is responsible for caching and
   // taking care of region change.
   // Also it may return nil if PD finds no Region for the key temporarily,
   // client should retry later.
-  Result<std::pair<region_info, peer_info>, Error> get_region(const std::string& key); 
+  Result<std::pair<Region, Peer>, Error> get_region(const std::string& key); 
   // GetRegionByID gets a region and its leader Peer from PD by id.
-  Result<std::pair<region_info, peer_info>, Error> get_region_by_id(uint64_t region_id);
+  Result<std::pair<Region, Peer>, Error> get_region_by_id(uint64_t region_id);
   // GetStore gets a store from PD by store id.
 	// The store may expire later. Caller is responsible for caching and taking care
 	// of store change.
-  Result<store_info, Error> get_store_by_id(uint64_t store_id);
+  Result<Store, Error> get_store_by_id(uint64_t store_id);
   // GetAllStores gets all stores from pd.
 	// The store may expire later. Caller is responsible for caching and taking care
 	// of store change.
-  Result<std::vector<store_info>, Error> get_all_stores();
+  Result<std::vector<Store>, Error> get_all_stores();
   uint64_t get_cluster_id() { return cluster_id_; }
 
 private:
-  Result<std::pair<std::map<uint64_t, pd_server_info>, pd_server_info>, Error> get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id);
-  Result<std::pair<region_info, peer_info>, Error> get_region_inner(pdpb::PD::Stub* stub, const std::string& key); 
-  Result<std::pair<region_info, peer_info>, Error> get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id);
-  Result<store_info, Error> get_store_by_id_inner(pdpb::PD::Stub* stub, uint64_t store_id); 
-  Result<std::vector<store_info>, Error> get_all_stores_inner(pdpb::PD::Stub* stub);
+  Result<std::pair<std::map<uint64_t, PDServerInfo>, PDServerInfo>, Error> get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id);
+  Result<std::pair<Region, Peer>, Error> get_region_inner(pdpb::PD::Stub* stub, const std::string& key); 
+  Result<std::pair<Region, Peer>, Error> get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id);
+  Result<Store, Error> get_store_by_id_inner(pdpb::PD::Stub* stub, uint64_t store_id); 
+  Result<std::vector<Store>, Error> get_all_stores_inner(pdpb::PD::Stub* stub);
 
   bool update_leader(pdpb::PD::Stub* stub);
   pdpb::PD::Stub* get_leader_stub(bool force=false);
 
 private:
   // leader conn
-  std::map<uint64_t, pd_server_info> members_;
-  pd_server_info leader_;
+  std::map<uint64_t, PDServerInfo> members_;
+  PDServerInfo leader_;
 
   // buffered rpc channels and stubs
   boost::shared_mutex rwlock_;

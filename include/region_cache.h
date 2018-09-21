@@ -11,13 +11,13 @@
 
 namespace tikv {
 
-class region_cache {
+class RegionCache {
 
  public:
   struct key_loc {
     std::string start_key;
     std::string end_key;
-    region_version_id region_ver_id;
+    RegionVerID region_ver_id;
 
     bool contains(const std::string& key) {
       return start_key.compare(key) <= 0 
@@ -26,16 +26,16 @@ class region_cache {
   };
 
   struct rpc_context {
-    region_version_id region_ver_id;
-    region_info meta;
-    peer_info peer;
+    RegionVerID region_ver_id;
+    Region meta;
+    Peer peer;
     std::string addr;
   };
 
   // region object stores region info and its leader peer
   struct cached_region {
-    region_info region;
-    peer_info leader;
+    Region region;
+    Peer leader;
     std::atomic<uint64_t> last_access;
 
     cached_region(): last_access(0) {};
@@ -58,29 +58,29 @@ class region_cache {
   };
 
  public:
-  region_cache(std::shared_ptr<pd_client> pd_client):
-      pd_client_(pd_client) {}
+  RegionCache(std::shared_ptr<PDClient> PDClient):
+      PDClient_(PDClient) {}
 
-  Result<key_loc,Error> locate_key(const std::string& key);
-  Result<rpc_context, Error> get_rpc_context(region_version_id ver_id);
+  Result<key_loc,Error> locate_key(const std::string& key, bool& cache_hit);
+  Result<rpc_context, Error> get_rpc_context(RegionVerID ver_id);
   Result<std::string, Error> get_store_addr(uint64_t store_id);
   Result<std::string, Error> reload_store_addr(uint64_t store_id);
 
-  void update_region_leader(region_version_id ver_id, uint16_t leader_store_id);
-  void drop_region(region_version_id region_id);
+  void update_region_leader(RegionVerID ver_id, uint16_t leader_store_id);
+  void drop_region(RegionVerID region_id);
 
   void dump_cache();
 
  private:
-  void insert_region_to_cache(const region_info& r);
-  void drop_region_from_cache(region_version_id region_id);
-  boost::optional<region_info&> search_cache(const std::string& key);
-  boost::optional<region_info&> get_cached_region(region_version_id ver_id);  
+  void insert_region_to_cache(const Region& r);
+  void drop_region_from_cache(RegionVerID region_id);
+  boost::optional<Region&> search_cache(const std::string& key);
+  boost::optional<Region&> get_cached_region(RegionVerID ver_id);  
 
   // get result throught RPC
-  Result<region_info, Error> load_region_from_pd(const std::string& key);  
-  Result<region_info, Error> load_region_from_pd_by_id(uint64_t region_id);  
-  Result<store_info, Error> load_store_from_pd(uint64_t store_id);  
+  Result<Region, Error> load_region_from_pd(const std::string& key);  
+  Result<Region, Error> load_region_from_pd_by_id(uint64_t region_id);  
+  Result<Store, Error> load_store_from_pd(uint64_t store_id);  
 
  private:
   // region cache ttl 600s
@@ -89,16 +89,16 @@ class region_cache {
  private:
   boost::shared_mutex region_lock_;
   // end_key => region
-  btree::btree_map<std::string, region_info> sorted_;
+  btree::btree_map<std::string, Region> sorted_;
   // region_id => region
-  std::map<region_version_id, cached_region> cached_regions_;
+  std::map<RegionVerID, cached_region> cached_regions_;
 
   boost::shared_mutex store_lock_;
   // store id => store
-  std::map<uint64_t, store_info> stores_;
+  std::map<uint64_t, Store> stores_;
   // pd client, for quering region info and store info
-  std::shared_ptr<pd_client> pd_client_;
+  std::shared_ptr<PDClient> PDClient_;
 
-}; // end of region_cache
+}; // end of RegionCache
 
 }; // end of tikv

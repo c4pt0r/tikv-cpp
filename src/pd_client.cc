@@ -15,13 +15,13 @@
 
 namespace tikv {
 
-pd_client::pd_client(const std::string& addr) {
+PDClient::PDClient(const std::string& addr) {
   init(addr);
 }
 
 // public APIs 
-Result<std::pair<region_info, peer_info>, Error>
-pd_client::get_region(const std::string& key) {
+Result<std::pair<Region, Peer>, Error>
+PDClient::get_region(const std::string& key) {
   auto r = get_region_inner(get_leader_stub(), key);
   if (!r.isOk()) {
     LOG("rpc call error: " << r.unwrapErr().error);
@@ -31,8 +31,8 @@ pd_client::get_region(const std::string& key) {
   return r;
 }
 
-Result<std::pair<region_info, peer_info>, Error>
-pd_client::get_region_by_id(uint64_t region_id) {
+Result<std::pair<Region, Peer>, Error>
+PDClient::get_region_by_id(uint64_t region_id) {
   auto r = get_region_by_id_inner(get_leader_stub(), region_id);
   if (!r.isOk()) {
     LOG("rpc call error: " << r.unwrapErr().error);
@@ -43,8 +43,8 @@ pd_client::get_region_by_id(uint64_t region_id) {
 
 }
 
-Result<store_info, Error>
-pd_client::get_store_by_id(uint64_t store_id) {  
+Result<Store, Error>
+PDClient::get_store_by_id(uint64_t store_id) {  
   auto r = get_store_by_id_inner(get_leader_stub(), store_id);
   if (!r.isOk()) {
     LOG("rpc call error: " << r.unwrapErr().error);
@@ -54,8 +54,8 @@ pd_client::get_store_by_id(uint64_t store_id) {
   return r; 
 }
 
-Result<std::vector<store_info>, Error> 
-pd_client::get_all_stores() {
+Result<std::vector<Store>, Error> 
+PDClient::get_all_stores() {
   auto r = get_all_stores_inner(get_leader_stub());
   if (!r.isOk()) {
     LOG("rpc call error: " << r.unwrapErr().error);
@@ -66,7 +66,7 @@ pd_client::get_all_stores() {
 }
 
 bool
-pd_client::init(const std::string& pdaddr) {
+PDClient::init(const std::string& pdaddr) {
   // create a temp api stub to fill member conn pool
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(strip_url(pdaddr),
                                                                 grpc::InsecureChannelCredentials());
@@ -74,7 +74,7 @@ pd_client::init(const std::string& pdaddr) {
   return update_leader(stub.get());
 }
 
-pdpb::PD::Stub* pd_client::get_leader_stub(bool force) {
+pdpb::PD::Stub* PDClient::get_leader_stub(bool force) {
   if (leader_stub_ == nullptr || force) {
     leader_stub_.reset();
     LOG("update pd leader client stub");
@@ -98,7 +98,7 @@ pdpb::PD::Stub* pd_client::get_leader_stub(bool force) {
 }
 
 bool 
-pd_client::update_leader(pdpb::PD::Stub* stub) {
+PDClient::update_leader(pdpb::PD::Stub* stub) {
   // update pd addrs
   uint64_t cluster_id;
   auto r = get_pd_members_inner(stub, &cluster_id);
@@ -127,16 +127,16 @@ pd_client::update_leader(pdpb::PD::Stub* stub) {
   }
 }
 
-Result<std::pair<std::map<uint64_t, pd_server_info>, pd_server_info>, Error>
-pd_client::get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id) {
+Result<std::pair<std::map<uint64_t, PDServerInfo>, PDServerInfo>, Error>
+PDClient::get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id) {
   pdpb::GetMembersRequest req;
   pdpb::GetMembersResponse resp;
   grpc::ClientContext ctx;
   grpc::Status st = stub->GetMembers(&ctx, req, &resp);
-  std::map<uint64_t, pd_server_info> ret;
+  std::map<uint64_t, PDServerInfo> ret;
   if (st.ok()) {
     for (auto it = resp.members().begin(); it != resp.members().end(); it++) {
-      pd_server_info info;
+      PDServerInfo info;
       info.name = it->name();
       info.id = it->member_id();
       info.is_leader = false;
@@ -145,7 +145,7 @@ pd_client::get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id) 
       
       ret[info.id] = info;
     }
-    pd_server_info leader;
+    PDServerInfo leader;
     leader.name = resp.leader().name();
     leader.id = resp.leader().member_id();
     leader.is_leader = true;
@@ -161,18 +161,18 @@ pd_client::get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id) 
   }
 }
 
-void convert_from_pb(const metapb::Store* store, store_info* ret) {
+void convert_from_pb(const metapb::Store* store, Store* ret) {
   ret->id = store->id();
   ret->addr = store->address();
   switch (store->state()) {
     case metapb::StoreState::Up: 
-      ret->state = tikv::store_state::UP;
+      ret->state = tikv::StoreState::UP;
       break;
     case metapb::StoreState::Offline:
-      ret->state = tikv::store_state::OFFLINE;
+      ret->state = tikv::StoreState::OFFLINE;
       break;
     case metapb::StoreState::Tombstone:
-      ret->state = tikv::store_state::TOMBSTONE;
+      ret->state = tikv::StoreState::TOMBSTONE;
       break;
     default:
       LOG("store state error, no such state" << store->state());
@@ -183,8 +183,8 @@ void convert_from_pb(const metapb::Store* store, store_info* ret) {
   }
 }
 
-Result<store_info, Error>
-pd_client::get_store_by_id_inner(pdpb::PD::Stub* stub,uint64_t store_id) {
+Result<Store, Error>
+PDClient::get_store_by_id_inner(pdpb::PD::Stub* stub,uint64_t store_id) {
   assert(cluster_id_ > 0);
   pdpb::GetStoreRequest req;
   pdpb::GetStoreResponse resp;
@@ -194,7 +194,7 @@ pd_client::get_store_by_id_inner(pdpb::PD::Stub* stub,uint64_t store_id) {
   grpc::ClientContext ctx;
   grpc::Status st = stub->GetStore(&ctx, req, &resp);
   if (st.ok()) {
-    store_info ret;
+    Store ret;
     metapb::Store s = resp.store();
     convert_from_pb(&s, &ret);
     return Ok(ret);
@@ -202,8 +202,8 @@ pd_client::get_store_by_id_inner(pdpb::PD::Stub* stub,uint64_t store_id) {
     return Err(Error(st.error_message()));
   }
 }
-Result<std::vector<store_info>, Error>
-pd_client::get_all_stores_inner(pdpb::PD::Stub* stub) {
+Result<std::vector<Store>, Error>
+PDClient::get_all_stores_inner(pdpb::PD::Stub* stub) {
   assert(cluster_id_ > 0);
   pdpb::GetAllStoresRequest req;
   pdpb::GetAllStoresResponse resp;
@@ -213,9 +213,9 @@ pd_client::get_all_stores_inner(pdpb::PD::Stub* stub) {
   grpc::Status st = stub->GetAllStores(&ctx, req, &resp);
 
   if (st.ok()) {
-    std::vector<store_info> ret;
+    std::vector<Store> ret;
     for (auto it = resp.stores().begin(); it != resp.stores().end(); it++) {
-      store_info info;
+      Store info;
       convert_from_pb(&(*it), &info);
       ret.push_back(info);
     }
@@ -225,17 +225,17 @@ pd_client::get_all_stores_inner(pdpb::PD::Stub* stub) {
   }
 }
 
-std::pair<region_info, peer_info>
+std::pair<Region, Peer>
 parse_get_region_result(const pdpb::GetRegionResponse& resp) {
-  region_info ret;
-  peer_info leader;
+  Region ret;
+  Peer leader;
   ret.ver_id.id = resp.region().id();
   ret.ver_id.conf_ver = resp.region().region_epoch().conf_ver();
   ret.ver_id.ver = resp.region().region_epoch().version();
   ret.start_key = resp.region().start_key();
   ret.end_key = resp.region().end_key();
   for (auto it = resp.region().peers().begin(); it != resp.region().peers().end(); it++) {
-    peer_info peer;
+    Peer peer;
     peer.id = it->id();
     peer.store_id = it->store_id();
     ret.peers.push_back(peer);
@@ -247,8 +247,8 @@ parse_get_region_result(const pdpb::GetRegionResponse& resp) {
   return std::make_pair(ret, leader);
 }
 
-Result<std::pair<region_info, peer_info>, Error>
-pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key) {
+Result<std::pair<Region, Peer>, Error>
+PDClient::get_region_inner(pdpb::PD::Stub* stub, const std::string& key) {
   // make sure client has already been initialized.
   assert(cluster_id_ > 0);
   pdpb::GetRegionRequest req;
@@ -267,8 +267,8 @@ pd_client::get_region_inner(pdpb::PD::Stub* stub, const std::string& key) {
   }
 }
 
-Result<std::pair<region_info, peer_info>, Error>
-pd_client::get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id) {
+Result<std::pair<Region, Peer>, Error>
+PDClient::get_region_by_id_inner(pdpb::PD::Stub* stub, uint64_t region_id) {
   // make sure client has already been initialized.
   assert(cluster_id_ > 0);
   pdpb::GetRegionByIDRequest req;
