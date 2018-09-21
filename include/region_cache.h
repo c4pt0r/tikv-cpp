@@ -41,7 +41,9 @@ class RegionCache {
     cached_region(): last_access(0) {};
 
     cached_region(const cached_region& b):
-      region(b.region), leader(b.leader), last_access(b.last_access.load()) {}
+      region(b.region), last_access(b.last_access.load()) {
+      leader = *region.leader();
+    }
 
     cached_region& operator=(const cached_region &b) {
       region = b.region;

@@ -9,9 +9,9 @@ namespace tikv {
 struct PDServerInfo {
   uint64_t id         = 0;
   uint64_t cluster_id = 0;
+  bool is_leader      = false;
   std::string name;
   std::vector<std::string> client_urls;
-  bool is_leader = false;
 };
 
 struct RegionVerID {
@@ -42,17 +42,34 @@ struct Region {
   std::string start_key;
   std::string end_key;
   std::vector<Peer> peers;
-  Peer* leader = nullptr;
+  inline Peer* leader() const { return leader_; }
 
-  bool contains(const std::string& key) {
+  // copy from other region info
+  Region(const Region& x) {
+    *this = x;
+  }
+
+  Region& operator=(const Region& x) {
+    ver_id = x.ver_id;
+    start_key = x.start_key;
+    end_key = x.end_key;
+    peers = x.peers;
+    switch_leader(x.leader()->store_id);
+    return *this;
+  }
+
+  Region() {}
+  ~Region() {}
+
+  inline bool contains(const std::string& key) {
     return start_key.compare(key) <= 0 
               && (end_key.compare(key) > 0 || end_key.size() == 0);
   }
 
-  void switch_leader(uint64_t store_id) {
+  inline void switch_leader(uint64_t store_id) {
     for (auto it= peers.begin(); it!= peers.end();it++) {
       if (it->store_id == store_id) {
-        leader = &*it;
+        leader_ = &*it;
       }
     }
   }
@@ -63,6 +80,10 @@ struct Region {
                     uint64_t leader_id, 
                     const std::string& split_key);
 
+
+ private:
+  // set by switch leader
+  Peer* leader_ = nullptr;
 };
 
 enum StoreState {
@@ -73,7 +94,7 @@ enum StoreState {
 
 struct Store {
   uint64_t id       = 0;
-  StoreState state = OFFLINE;
+  StoreState state  = OFFLINE;
 
   std::string addr;
   std::map<std::string, std::string> labels;
@@ -81,7 +102,7 @@ struct Store {
 
 struct Error {
   std::string error;
-  Error(const std::string& errmsg): error(errmsg) {}
+  Error(const std::string& msg): error(msg) {}
 };
 
 }; // tikv

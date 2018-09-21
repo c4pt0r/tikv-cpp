@@ -10,7 +10,7 @@ RegionCache::dump_cache() {
   for (auto it = sorted_.begin(); it != sorted_.end(); it++) {
     cached_region cr = cached_regions_[it->second.ver_id];
     LOG("[" << to_hex(cr.region.start_key) << "," << to_hex(cr.region.end_key) << ") => Leader store:" 
-        << cr.region.leader->store_id << std::endl);
+        << cr.region.leader()->store_id << std::endl);
   }
 }
 
@@ -58,7 +58,7 @@ RegionCache::get_rpc_context(RegionVerID ver_id) {
   Region ri = *r;
   region_lock_.unlock_shared();
 
-  auto ret = get_store_addr(ri.leader->store_id);
+  auto ret = get_store_addr(ri.leader()->store_id);
   if (ret.isOk()) {
     // something wrong with getting store addr
     if (ret.unwrap().size() == 0) {
@@ -70,7 +70,7 @@ RegionCache::get_rpc_context(RegionVerID ver_id) {
     rpc_context ctx;
     ctx.addr = addr; 
     ctx.meta = ri;
-    ctx.peer = *ri.leader;
+    ctx.peer = *ri.leader();
     return Ok(ctx);
   } else {
     return Err(ret.unwrapErr());
