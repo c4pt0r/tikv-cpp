@@ -74,11 +74,32 @@ struct Region {
     }
   }
 
+  inline void switch_leader_by_peer_id(uint64_t peer_id) {
+    for (auto it= peers.begin(); it!= peers.end();it++) {
+      if (it->id == peer_id) {
+        leader_ = &*it;
+      }
+    }
+  }
+
  private:
   // only used by mocktikv
+  void incr_ver() { ver_id.ver++; }
+  void incr_conf_ver() { ver_id.conf_ver++; }
+
+  void update_key_range(const std::string& start, 
+                        const std::string& end) {
+    start_key = start;
+    end_key = end;
+    incr_ver();
+  }
+
+  
   Region split(std::vector<uint64_t> peer_ids, 
                     uint64_t leader_id, 
                     const std::string& split_key);
+
+
 
 
  private:

@@ -4,6 +4,7 @@ add_subdirectory(3rd_party/catch)
 include_directories(../include)
 
 add_executable(unit_tests 
+    mocktikv.cc
     region_cache_test.cc
     pd_client_test.cc)
 
