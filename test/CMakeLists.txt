@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 add_subdirectory(3rd_party/catch)
+
 include_directories(../include)
 
 add_executable(unit_tests 
@@ -10,6 +11,7 @@ add_executable(unit_tests
 
 target_link_libraries(unit_tests
     tikv-cpp-api
+    jsoncpp_lib_static
     Catch::Test
 )
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/thread/shared_mutex.hpp>
+#include "3rd_party/jsoncpp/include/json/json.h"
 #include "meta.h"
 
 namespace tikv {
@@ -23,6 +24,7 @@ class Cluster {
              const std::string& split_key,
              const std::vector<uint64_t>& peer_ids,
              uint64_t leader_peer_id);
+
 
  private:
   uint64_t allocate_id_inner();
