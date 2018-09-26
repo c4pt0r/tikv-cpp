@@ -244,6 +244,8 @@ parse_get_region_result(const pdpb::GetRegionResponse& resp) {
   leader.store_id = resp.leader().store_id();
   leader.id = resp.leader().id();
 
+  ret.switch_leader_by_peer_id(leader.id);
+
   return std::make_pair(ret, leader);
 }
 

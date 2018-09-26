@@ -1,6 +1,7 @@
 #include <string>
 #include "pd_client.h"
 #include "logging.h"
+#include "mocktikv.h"
 #include "3rd_party/cpp-btree/btree_map.h"
 
 #define CATCH_CONFIG_MAIN
@@ -30,8 +31,7 @@ TEST_CASE("get stores") {
   REQUIRE(rr.unwrap().addr.size() > 0);
 }
 
-TEST_CASE("btree") {
-  btree::btree_map<int, std::string> m;
+TEST_CASE("btree") { btree::btree_map<int, std::string> m;
   m[1] = "1";
   m[3] = "3";
   m[5] = "5";
@@ -66,3 +66,5 @@ TEST_CASE("verid compare") {
 
   REQUIRE(m[verid1] == 1);
 }
+
+
