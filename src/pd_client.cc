@@ -161,10 +161,10 @@ PDClient::get_pd_members_inner(pdpb::PD::Stub* stub, uint64_t* out_cluster_id) {
   }
 }
 
-void convert_from_pb(const metapb::Store* store, Store* ret) {
-  ret->id = store->id();
-  ret->addr = store->address();
-  switch (store->state()) {
+void convert_from_pb(const metapb::Store& store, Store* ret) {
+  ret->id = store.id();
+  ret->addr = store.address();
+  switch (store.state()) {
     case metapb::StoreState::Up: 
       ret->state = tikv::StoreState::UP;
       break;
@@ -175,10 +175,10 @@ void convert_from_pb(const metapb::Store* store, Store* ret) {
       ret->state = tikv::StoreState::TOMBSTONE;
       break;
     default:
-      LOG("store state error, no such state" << store->state());
+      LOG("store state error, no such state" << store.state());
       assert(0);
   }
-  for (auto it = store->labels().begin(); it != store->labels().end(); it++) {
+  for (auto it = store.labels().begin(); it != store.labels().end(); it++) {
     ret->labels[it->key()] = it->value();
   }
 }
@@ -195,8 +195,7 @@ PDClient::get_store_by_id_inner(pdpb::PD::Stub* stub,uint64_t store_id) {
   grpc::Status st = stub->GetStore(&ctx, req, &resp);
   if (st.ok()) {
     Store ret;
-    metapb::Store s = resp.store();
-    convert_from_pb(&s, &ret);
+    convert_from_pb(resp.store(), &ret);
     return Ok(ret);
   } else {
     return Err(Error(st.error_message()));
@@ -216,7 +215,7 @@ PDClient::get_all_stores_inner(pdpb::PD::Stub* stub) {
     std::vector<Store> ret;
     for (auto it = resp.stores().begin(); it != resp.stores().end(); it++) {
       Store info;
-      convert_from_pb(&(*it), &info);
+      convert_from_pb(*it, &info);
       ret.push_back(info);
     }
     return Ok(ret);

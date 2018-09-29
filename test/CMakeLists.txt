@@ -8,7 +8,6 @@ add_executable(unit_tests
     mocktikv.cc
     region_cache_test.cc
     mocktikv_test.cc
-    region_test.cc
     pd_client_test.cc)
 
 target_link_libraries(unit_tests
