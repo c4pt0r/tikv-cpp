@@ -49,7 +49,9 @@ boost::optional<Store> Cluster::get_store(uint64_t store_id) {
 }
 
 void Cluster::remove_store(uint64_t store_id) {
-  
+  // TODO lock
+  auto it = stores_.find(store_id);
+  stores_.erase(store_id);
 }
 
 void Cluster::split(uint64_t region_id, uint64_t new_region_id, 
